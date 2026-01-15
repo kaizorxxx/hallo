@@ -61,17 +61,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         
         setLoading(true);
         try {
+            // Include metadata directly in signUp options
+            // This is safer and ensures data is stored even if profiles insert fails
             const { data, error } = await supabase.auth.signUp({ 
                 email, 
                 password,
                 options: {
-                    emailRedirectTo: window.location.origin
+                    emailRedirectTo: window.location.origin,
+                    data: {
+                        full_name: fullName,
+                        phone: phoneNumber,
+                        username: email.split('@')[0],
+                    }
                 }
             });
             
             if (error) throw error;
 
-            // Insert Profile Data immediately
+            // Attempt to insert into profiles table as well
             if (data.user) {
                 const { error: profileError } = await supabase.from('profiles').upsert({
                     id: data.user.id,
@@ -82,7 +89,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 });
                 
                 if (profileError) {
-                    console.error("Error creating profile:", profileError);
+                    // We log this but don't stop the flow because metadata is already saved in Auth
+                    console.error("Warning: Profile table insert failed (Metadata saved in Auth).", profileError);
                 }
             }
 
