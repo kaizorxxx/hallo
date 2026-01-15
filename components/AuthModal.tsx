@@ -9,6 +9,12 @@ interface AuthModalProps {
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // New Fields
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -27,12 +33,29 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     return () => clearInterval(interval);
   }, [rateLimitSeconds]);
 
+  // Reset fields when mode changes or modal opens
+  useEffect(() => {
+    if(isOpen) {
+        setErrorMsg('');
+        // Optional: clear inputs on open
+    }
+  }, [isOpen, isSignUp]);
+
   if (!isOpen) return null;
 
   const handleAuth = async () => {
     setErrorMsg('');
 
     if (isSignUp) {
+        // Validation
+        if (password !== confirmPassword) {
+            setErrorMsg("Passwords do not match.");
+            return;
+        }
+        if (!fullName.trim() || !phoneNumber.trim()) {
+            setErrorMsg("Please fill in all fields.");
+            return;
+        }
         // Prevent spam
         if (rateLimitSeconds > 0) return;
         
@@ -48,6 +71,23 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             
             if (error) throw error;
 
+            // Insert Profile Data immediately
+            if (data.user) {
+                const { error: profileError } = await supabase.from('profiles').upsert({
+                    id: data.user.id,
+                    username: email.split('@')[0], // Default username
+                    full_name: fullName,
+                    phone: phoneNumber,
+                    updated_at: new Date()
+                });
+                
+                if (profileError) {
+                    console.error("Error creating profile:", profileError);
+                    // We don't throw here to avoid blocking the auth success message, 
+                    // but in a strict app you might want to handle this.
+                }
+            }
+
             // Trigger rate limit
             setRateLimitSeconds(30);
 
@@ -56,7 +96,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 alert('Registration successful! Please check your email inbox to verify your account before logging in.');
                 onClose();
             } else if (data.user && data.session) {
-                // Auto-login scenario (if verification is optional in Supabase config)
                 onClose();
             }
         } catch (error: any) {
@@ -85,12 +124,31 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[300] flex justify-center items-center p-5 backdrop-blur-sm">
-      <div className="bg-[#282828] w-full max-w-[350px] p-6 rounded-xl shadow-2xl flex flex-col gap-4">
+      <div className="bg-[#282828] w-full max-w-[350px] p-6 rounded-xl shadow-2xl flex flex-col gap-3 max-h-[90vh] overflow-y-auto scrollbar-hide">
         <h3 className="text-xl font-bold text-center text-white mb-2">
           {isSignUp ? 'Create Account' : 'Welcome Back'}
         </h3>
 
-        {errorMsg && <p className="text-red-500 text-xs text-center">{errorMsg}</p>}
+        {errorMsg && <p className="text-red-500 text-xs text-center font-bold bg-red-900/20 p-2 rounded">{errorMsg}</p>}
+
+        {isSignUp && (
+            <>
+                <input
+                    type="text"
+                    placeholder="Full Name"
+                    className="bg-[#3e3e3e] border border-[#555] p-3 rounded-md text-white outline-none text-sm w-full focus:border-[#1db954] transition-colors"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                />
+                <input
+                    type="tel"
+                    placeholder="Active Phone Number"
+                    className="bg-[#3e3e3e] border border-[#555] p-3 rounded-md text-white outline-none text-sm w-full focus:border-[#1db954] transition-colors"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                />
+            </>
+        )}
 
         <input
           type="email"
@@ -107,10 +165,20 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           onChange={(e) => setPassword(e.target.value)}
         />
 
+        {isSignUp && (
+            <input
+                type="password"
+                placeholder="Confirm Password"
+                className="bg-[#3e3e3e] border border-[#555] p-3 rounded-md text-white outline-none text-sm w-full focus:border-[#1db954] transition-colors"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+        )}
+
         <button
           onClick={handleAuth}
           disabled={loading || (isSignUp && rateLimitSeconds > 0)}
-          className="bg-[#1db954] text-black font-bold py-3 rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
+          className="bg-[#1db954] text-black font-bold py-3 rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed mt-2"
         >
           {loading 
             ? 'Processing...' 
@@ -120,7 +188,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           }
         </button>
 
-        <div className="flex items-center gap-2 my-2">
+        <div className="flex items-center gap-2 my-1">
           <div className="h-[1px] bg-[#555] flex-1"></div>
           <span className="text-xs text-[#aaa]">OR</span>
           <div className="h-[1px] bg-[#555] flex-1"></div>
@@ -144,7 +212,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </p>
         </div>
         
-        <button onClick={onClose} className="text-xs text-[#777] hover:text-white mt-2">Cancel</button>
+        <button onClick={onClose} className="text-xs text-[#777] hover:text-white mt-1">Cancel</button>
       </div>
     </div>
   );

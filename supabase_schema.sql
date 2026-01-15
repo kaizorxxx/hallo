@@ -2,6 +2,8 @@
 create table public.profiles (
   id uuid references auth.users not null primary key,
   username text,
+  full_name text,
+  phone text,
   avatar_url text,
   updated_at timestamp with time zone
 );
