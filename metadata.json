@@ -1,0 +1,5 @@
+{
+  "name": "SXATAKU Music Hub",
+  "description": "A cloud-synced music player with Spotify-esque aesthetics, featuring multi-provider authentication and database storage.",
+  "requestFramePermissions": []
+}
