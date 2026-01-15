@@ -49,7 +49,7 @@ const App: React.FC = () => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser && currentUser.email_confirmed_at) {
-          fetchData(currentUser.id);
+          fetchData(currentUser);
       }
     });
 
@@ -58,9 +58,8 @@ const App: React.FC = () => {
       setUser(currentUser);
       
       // Strict Verification Gate
-      // Only fetch data if email is confirmed (or provider is not email, implicitly handled by confirmed_at usually)
       if (currentUser && currentUser.email_confirmed_at) {
-          fetchData(currentUser.id);
+          fetchData(currentUser);
       } else {
           // Reset data if logged out or unverified
           setLikedSongs([]);
@@ -72,11 +71,25 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchData = async (userId: string) => {
+  const fetchData = async (currentUser: any) => {
       try {
-          const prof = await dbService.getProfile(userId);
-          // Fallback if profile doesn't exist yet (created via trigger or manual)
-          setProfile(prof || { id: userId, username: user?.email?.split('@')[0] || 'User', avatar_url: null });
+          const userId = currentUser.id;
+          let prof = await dbService.getProfile(userId);
+          
+          // Auto-create profile for OAuth users who might not have one yet
+          if (!prof) {
+              const newProfile: Profile = {
+                  id: userId,
+                  username: currentUser.email?.split('@')[0] || 'User',
+                  full_name: currentUser.user_metadata?.full_name || '',
+                  avatar_url: currentUser.user_metadata?.avatar_url || null,
+                  phone: '' 
+              };
+              await dbService.upsertProfile(newProfile);
+              prof = newProfile;
+          }
+
+          setProfile(prof);
           
           const liked = await dbService.getLikedSongs(userId);
           setLikedSongs(liked);
@@ -84,7 +97,8 @@ const App: React.FC = () => {
           const pls = await dbService.getPlaylists(userId);
           setPlaylists(pls);
       } catch (e) {
-          console.error("Error fetching data", e);
+          console.error("Critical: Failed to sync with Supabase.", e);
+          // Optional: Display user-friendly error toast here
       }
   };
 
@@ -204,6 +218,7 @@ const App: React.FC = () => {
               songs: []
           }]);
       } catch (e) {
+          console.error("Failed to create playlist", e);
           alert("Failed to create playlist");
       }
   };

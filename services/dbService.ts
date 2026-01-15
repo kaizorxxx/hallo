@@ -1,10 +1,17 @@
 import { supabase } from '../supabaseClient';
-import { Song, Playlist } from '../types';
+import { Song, Playlist, Profile } from '../types';
 
 export const dbService = {
   async getProfile(userId: string) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    // Allow PGRST116 (No rows found) so we can create one if needed
+    if (error && error.code !== 'PGRST116') throw error;
     return data;
+  },
+
+  async upsertProfile(profile: Profile) {
+    const { error } = await supabase.from('profiles').upsert(profile);
+    if (error) throw error;
   },
 
   async getLikedSongs(userId: string): Promise<Song[]> {

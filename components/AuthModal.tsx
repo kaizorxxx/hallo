@@ -83,8 +83,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 
                 if (profileError) {
                     console.error("Error creating profile:", profileError);
-                    // We don't throw here to avoid blocking the auth success message, 
-                    // but in a strict app you might want to handle this.
                 }
             }
 
@@ -119,7 +117,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleOAuth = async (provider: 'google' | 'github' | 'facebook') => {
-    await supabase.auth.signInWithOAuth({ provider });
+    try {
+        const { error } = await supabase.auth.signInWithOAuth({ 
+            provider,
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+        if (error) throw error;
+    } catch (error: any) {
+        setErrorMsg(error.message);
+    }
   };
 
   return (
